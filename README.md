@@ -2,6 +2,13 @@
 
 **HireLens** is an AI-powered resume screening service. Upload a PDF resume and a job description; the API returns immediately with an evaluation ID while a background worker scores the candidate using Google Gemini, persists results in MongoDB, and exposes status and scores over a simple REST API.
 
+| Resource | Link |
+|----------|------|
+| **Source code** | [github.com/ganeshkasture95/AI-Resume-Screening-Service](https://github.com/ganeshkasture95/AI-Resume-Screening-Service) |
+| **Docker images** | [hub.docker.com/r/ganeshkasture95/hirelens](https://hub.docker.com/r/ganeshkasture95/hirelens) |
+
+Container images are published under **`ganeshkasture95/hirelens`** with tags **`api-latest`** (Next.js API) and **`worker-latest`** (BullMQ worker).
+
 ---
 
 ## Features
@@ -38,8 +45,8 @@
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/<your-username>/hirelens.git
-cd hirelens
+git clone https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
+cd AI-Resume-Screening-Service
 npm install
 ```
 
@@ -115,27 +122,25 @@ docker compose down
 
 ---
 
-## Docker Hub — build and push images
+## Docker Hub — images
 
-Images use a **single repository** with two tags: `api-latest` (Next.js API) and `worker-latest` (BullMQ worker).
+Published repository: **[ganeshkasture95/hirelens](https://hub.docker.com/repository/docker/ganeshkasture95/hirelens/general)** — tags **`api-latest`** (Next.js API) and **`worker-latest`** (BullMQ worker).
 
-Replace `YOUR_DOCKERHUB` with your Docker Hub username.
+Pull pre-built images:
 
 ```bash
-docker login
-
-docker build -t YOUR_DOCKERHUB/hirelens:api-latest -f Dockerfile .
-docker build -t YOUR_DOCKERHUB/hirelens:worker-latest -f worker/Dockerfile .
-
-docker push YOUR_DOCKERHUB/hirelens:api-latest
-docker push YOUR_DOCKERHUB/hirelens:worker-latest
+docker pull ganeshkasture95/hirelens:api-latest
+docker pull ganeshkasture95/hirelens:worker-latest
 ```
 
-Pull on any machine:
+Rebuild and push (after `docker login`):
 
 ```bash
-docker pull YOUR_DOCKERHUB/hirelens:api-latest
-docker pull YOUR_DOCKERHUB/hirelens:worker-latest
+docker build -t ganeshkasture95/hirelens:api-latest -f Dockerfile .
+docker build -t ganeshkasture95/hirelens:worker-latest -f worker/Dockerfile .
+
+docker push ganeshkasture95/hirelens:api-latest
+docker push ganeshkasture95/hirelens:worker-latest
 ```
 
 ---
@@ -151,7 +156,7 @@ On the server, copy:
 Example `.env.deploy`:
 
 ```env
-DOCKERHUB_USERNAME=YOUR_DOCKERHUB
+DOCKERHUB_USERNAME=ganeshkasture95
 API_IMAGE_TAG=api-latest
 WORKER_IMAGE_TAG=worker-latest
 ```
@@ -174,16 +179,25 @@ Open port **3000** in your cloud security group / firewall if you access the UI 
 
 ---
 
-## Git & GitHub — common commands
+## Git & GitHub
 
-Initialize and first push (if you are creating the repo from this folder):
+Remote for this project: **[ganeshkasture95/AI-Resume-Screening-Service](https://github.com/ganeshkasture95/AI-Resume-Screening-Service)**.
+
+Clone (contributors):
+
+```bash
+git clone https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
+cd AI-Resume-Screening-Service
+```
+
+If you are initializing a new clone and pushing for the first time:
 
 ```bash
 git init
 git add .
 git commit -m "feat: HireLens initial resume screening service"
 git branch -M main
-git remote add origin https://github.com/<your-username>/hirelens.git
+git remote add origin https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
 git push -u origin main
 ```
 
