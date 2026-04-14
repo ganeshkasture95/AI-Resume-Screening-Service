@@ -1,15 +1,27 @@
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { EvaluationModel } from "@/lib/models/Evaluation";
+import { enqueueEvaluationJob } from "@/lib/queue/bull";
 import { PDFParse } from "pdf-parse";
 import { v4 as uuidv4 } from "uuid";
 
 export const runtime = "nodejs";
 
 async function extractResumeText(file: File): Promise<string> {
+    if (file.size === 0) {
+        throw new Error("Uploaded PDF is empty.");
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const parser = new PDFParse({ data: buffer });
-    const parsed = await parser.getText();
-    return parsed.text?.trim() ?? "";
+    try {
+        const parsed = await parser.getText();
+        return parsed.text?.trim() ?? "";
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown PDF parse error";
+        throw new Error(`Could not parse the uploaded PDF. ${message}`);
+    } finally {
+        await parser.destroy();
+    }
 }
 
 export async function POST(request: Request) {
@@ -39,7 +51,21 @@ export async function POST(request: Request) {
             );
         }
 
-        const resumeText = await extractResumeText(resume);
+        let resumeText = "";
+        try {
+            resumeText = await extractResumeText(resume);
+        } catch (error) {
+            return Response.json(
+                {
+                    error:
+                        error instanceof Error
+                            ? error.message
+                            : "Could not read the uploaded PDF.",
+                },
+                { status: 400 },
+            );
+        }
+
         if (!resumeText) {
             return Response.json(
                 { error: "Could not extract text from the PDF resume." },
@@ -63,11 +89,36 @@ export async function POST(request: Request) {
             missingRequirements: [],
         });
 
+        try {
+            await enqueueEvaluationJob({ evaluationId });
+        } catch (error) {
+            await EvaluationModel.updateOne(
+                { evaluationId },
+                {
+                    $set: {
+                        status: "failed",
+                        error: "Failed to enqueue evaluation job.",
+                    },
+                },
+            );
+
+            return Response.json(
+                {
+                    error:
+                        error instanceof Error
+                            ? `Queue connection failed: ${error.message}`
+                            : "Queue connection failed.",
+                },
+                { status: 503 },
+            );
+        }
+
         return Response.json(
             { evaluation_id: evaluationId, status: "queued" },
             { status: 202 },
         );
     } catch (error) {
+        console.error("POST /api/evaluations failed:", error);
         return Response.json(
             {
                 error:

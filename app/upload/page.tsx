@@ -55,7 +55,13 @@ export default function UploadPage() {
           </Link>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          method="post"
+          action="/api/evaluations"
+          encType="multipart/form-data"
+          className="space-y-4"
+        >
           <div>
             <label htmlFor="resume" className="mb-1 block text-sm font-medium">
               Resume (PDF)
