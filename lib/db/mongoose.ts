@@ -7,6 +7,8 @@ if (!MONGO_DB_URL) {
   throw new Error("Missing MONGO_DB_URL in environment variables");
 }
 
+const mongoDbUrl: string = MONGO_DB_URL;
+
 declare global {
   var mongooseConnection:
     | {
@@ -24,9 +26,16 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     return cached.conn;
   }
 
+  if (mongoose.connection.readyState === 1) {
+    cached.conn = mongoose;
+    return cached.conn;
+  }
+
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGO_DB_URL, {
+    cached.promise = mongoose.connect(mongoDbUrl, {
       dbName: MONGO_DB_NAME,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 10000,
     });
   }
 
