@@ -1,96 +1,50 @@
 # HireLens
 
-**HireLens** is an AI-powered resume screening service. Upload a PDF resume and a job description; the API returns immediately with an evaluation ID while a background worker scores the candidate using Google Gemini, persists results in MongoDB, and exposes status and scores over a simple REST API.
+AI-powered resume screening: upload a PDF and a job description, get a `202` with an `evaluation_id`, then poll for score and verdict. Built with **Next.js**, **MongoDB**, **Redis / BullMQ**, and **Google Gemini**. Prompts live in `prompts/*.md`; LLM output is validated with Zod.
 
-| Resource | Link |
-|----------|------|
-| **Source code** | [github.com/ganeshkasture95/AI-Resume-Screening-Service](https://github.com/ganeshkasture95/AI-Resume-Screening-Service) |
-| **Docker images** | [hub.docker.com/r/ganeshkasture95/hirelens](https://hub.docker.com/r/ganeshkasture95/hirelens) |
-
-Container images are published under **`ganeshkasture95/hirelens`** with tags **`api-latest`** (Next.js API) and **`worker-latest`** (BullMQ worker).
+| | |
+|--|--|
+| **GitHub** | [ganeshkasture95/AI-Resume-Screening-Service](https://github.com/ganeshkasture95/AI-Resume-Screening-Service) |
+| **Docker Hub** | [ganeshkasture95/hirelens](https://hub.docker.com/repository/docker/ganeshkasture95/hirelens/general) (`api-latest`, `worker-latest`) |
 
 ---
 
-## Features
+## Stack
 
-- **Async REST API** — `POST /api/evaluations` returns `202` with `evaluation_id`; `GET /api/evaluations/:id` returns status and results.
-- **Queue-backed workers** — BullMQ + Redis decouple HTTP from LLM latency.
-- **Structured LLM output** — Prompts live in `prompts/*.md`; responses are validated with Zod.
-- **Docker-ready** — API, worker, MongoDB, and Redis run together via Compose.
-
----
-
-## Architecture
-
-| Layer | Technology |
-|--------|------------|
-| Web & API | Next.js (App Router) |
-| Database | MongoDB |
+| Layer | Tech |
+|-------|------|
+| API & UI | Next.js (App Router) |
+| DB | MongoDB |
 | Queue | Redis + BullMQ |
-| AI | Google Gemini (`@google/genai`) |
-| PDF text | `pdf-parse` |
-
----
-
-## Prerequisites
-
-- **Node.js** 20+
-- **MongoDB** and **Redis** (local, Docker, or cloud)
-- **Google Gemini API key** ([Google AI Studio](https://aistudio.google.com/apikey))
+| AI | Google Gemini |
+| PDF | `pdf-parse` |
 
 ---
 
 ## Local development
 
-### 1. Clone and install
-
 ```bash
 git clone https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
 cd AI-Resume-Screening-Service
 npm install
-```
-
-### 2. Environment
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set at least:
-
-- `MONGO_DB_URL`
-- `REDIS_URL`
-- `GOOGLE_GEMINI_API_KEY`
-- `GEMINI_MODEL` (e.g. `gemini-2.5-flash`)
-
-Never commit real secrets. `.env` is gitignored.
-
-### 3. Run the app
-
-**Terminal 1 — API**
+Set in `.env`: `MONGO_DB_URL`, `REDIS_URL`, `GOOGLE_GEMINI_API_KEY`, `GEMINI_MODEL`. Never commit `.env`.
 
 ```bash
+# Terminal 1
 npm run dev
-```
 
-**Terminal 2 — Worker**
-
-```bash
+# Terminal 2
 npm run worker:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and use **Upload** to submit a resume.
-
-### 4. Production build (local)
-
-```bash
-npm run build
-npm run start
-```
+Open [http://localhost:3000](http://localhost:3000). Production build locally: `npm run build && npm start`.
 
 ---
 
-## Testing
+## Tests
 
 ```bash
 npm test
@@ -99,61 +53,87 @@ npm run test:integration
 
 ---
 
-## Docker (full stack locally)
+## Docker (local full stack)
 
-Build and run API, worker, MongoDB, and Redis:
+From repo root, with `.env` filled (at least `GOOGLE_GEMINI_API_KEY`):
 
 ```bash
-cp .env.example .env
-# Fill GOOGLE_GEMINI_API_KEY and any overrides; compose sets Mongo/Redis URLs for containers.
-
 docker compose up --build
 ```
 
-- **App:** [http://localhost:3000](http://localhost:3000)
-- **MongoDB:** `localhost:27017`
-- **Redis:** `localhost:6379`
-
-Stop:
-
-```bash
-docker compose down
-```
+App: [http://localhost:3000](http://localhost:3000). Stop: `docker compose down`.
 
 ---
 
-## Docker Hub — images
-
-Published repository: **[ganeshkasture95/hirelens](https://hub.docker.com/repository/docker/ganeshkasture95/hirelens/general)** — tags **`api-latest`** (Next.js API) and **`worker-latest`** (BullMQ worker).
-
-Pull pre-built images:
+## Docker Hub (images)
 
 ```bash
 docker pull ganeshkasture95/hirelens:api-latest
 docker pull ganeshkasture95/hirelens:worker-latest
 ```
 
-Rebuild and push (after `docker login`):
+Rebuild & push (maintainers, after `docker login`):
 
 ```bash
 docker build -t ganeshkasture95/hirelens:api-latest -f Dockerfile .
 docker build -t ganeshkasture95/hirelens:worker-latest -f worker/Dockerfile .
-
 docker push ganeshkasture95/hirelens:api-latest
 docker push ganeshkasture95/hirelens:worker-latest
 ```
 
 ---
 
-## Deploy with pre-built images (e.g. EC2)
+## Run on AWS EC2 (Ubuntu) — step by step
 
-On the server, copy:
+These steps run the **pre-built** Hub images plus MongoDB and Redis **on the instance** (`docker-compose.deploy.yml`). You do not need external Mongo/Redis for this flow.
 
-- `docker-compose.deploy.yml`
-- `.env` (from `.env.example`, with real secrets)
-- `.env.deploy` (from `.env.deploy.example`)
+### 1. Create the EC2 instance
 
-Example `.env.deploy`:
+- Ubuntu 22.04+ (or similar).
+- Allow inbound in the **security group**:
+  - **TCP 22** — SSH (restrict to your IP if possible).
+  - **TCP 3000** — web app (your IP or `0.0.0.0/0` for a public demo).
+
+Do **not** open 27017 / 6379 to the internet unless you have a specific need; the app talks to Mongo/Redis inside Docker.
+
+### 2. Install Docker on the server
+
+SSH in, then (Ubuntu):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${VERSION_CODENAME:-jammy}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+
+Log out and SSH back in so `docker` works without `sudo`.
+
+### 3. Get the repo on the instance
+
+`docker-compose.deploy.yml` must live **in the same directory** you run `docker compose` from, alongside `.env` and `.env.deploy`.
+
+```bash
+cd ~
+git clone https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
+cd AI-Resume-Screening-Service
+```
+
+### 4. Configure environment
+
+```bash
+cp .env.example .env
+vim .env
+```
+
+Set **`GOOGLE_GEMINI_API_KEY`** (and **`GEMINI_MODEL`** if you override the default). Compose injects **`MONGO_DB_URL`** and **`REDIS_URL`** for the bundled containers — you can leave localhost entries in `.env` as placeholders; the deploy file overrides them for API/worker.
+
+Create **`.env.deploy`** in **this same folder** (copy from `.env.deploy.example` or create manually):
 
 ```env
 DOCKERHUB_USERNAME=ganeshkasture95
@@ -161,80 +141,61 @@ API_IMAGE_TAG=api-latest
 WORKER_IMAGE_TAG=worker-latest
 ```
 
-Run:
+If `.env.deploy` is only in a parent directory, either **copy it into `AI-Resume-Screening-Service/`** or pass `--env-file /full/path/to/.env.deploy`.
+
+### 5. Pull and start
 
 ```bash
 docker login
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml pull
 docker compose --env-file .env.deploy -f docker-compose.deploy.yml up -d
 ```
 
-Check status:
+### 6. Verify
 
 ```bash
 docker compose --env-file .env.deploy -f docker-compose.deploy.yml ps
-docker compose --env-file .env.deploy -f docker-compose.deploy.yml logs -f api worker
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
 ```
 
-Open port **3000** in your cloud security group / firewall if you access the UI externally.
+Logs: `docker compose --env-file .env.deploy -f docker-compose.deploy.yml logs -f api worker`
 
----
+### 7. Open the app in a browser
 
-## Git & GitHub
+Use **HTTP**, not HTTPS (there is no TLS on port 3000 by default):
 
-Remote for this project: **[ganeshkasture95/AI-Resume-Screening-Service](https://github.com/ganeshkasture95/AI-Resume-Screening-Service)**.
-
-Clone (contributors):
-
-```bash
-git clone https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
-cd AI-Resume-Screening-Service
+```text
+http://<EC2_PUBLIC_IP>:3000
 ```
 
-If you are initializing a new clone and pushing for the first time:
+If you see **ERR_SSL_PROTOCOL_ERROR**, the browser is using **https://**. Switch to **`http://`** explicitly and include **`:3000`**.
+
+### 8. Stop the stack
 
 ```bash
-git init
-git add .
-git commit -m "feat: HireLens initial resume screening service"
-git branch -M main
-git remote add origin https://github.com/ganeshkasture95/AI-Resume-Screening-Service.git
-git push -u origin main
-```
-
-Day-to-day:
-
-```bash
-git status
-git add <files>
-git commit -m "your message"
-git push origin main
-```
-
-Pull latest:
-
-```bash
-git pull origin main
+cd ~/AI-Resume-Screening-Service
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml down
 ```
 
 ---
 
-## API quick reference
+## API
 
 | Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/evaluations` | Multipart: `resume` (PDF), `job_description` (`text`) → `202` + `evaluation_id` |
-| `GET` | `/api/evaluations/:id` | Status and result when completed |
+|--------|------|----------------|
+| `POST` | `/api/evaluations` | Form: `resume` (PDF), `job_description` → `202` + `evaluation_id` |
+| `GET` | `/api/evaluations/:id` | Status and result when ready |
 
 ---
 
 ## Security
 
-- Do **not** commit `.env` or API keys.
-- Use `.env.example` only as a template.
-- Rotate keys if they are ever exposed.
+- Never commit `.env` or API keys.
+- Rotate keys if exposed.
+- For production HTTPS, put a reverse proxy or load balancer with a real certificate in front; do not expect SSL on raw `:3000` without that setup.
 
 ---
 
 ## License
 
-Private / project use unless you add an explicit license.
+Private / project use unless you add a license file.
