@@ -11,6 +11,11 @@ const EVALUATION_QUEUE_NAME =
   process.env.BULLMQ_QUEUE_NAME ?? "resume-evaluation-queue";
 const WORKER_CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? "2");
 
+console.log("Worker environment check:");
+console.log("- GEMINI_MODEL:", process.env.GEMINI_MODEL);
+console.log("- GOOGLE_GEMINI_API_KEY:", process.env.GOOGLE_GEMINI_API_KEY ? "SET" : "NOT SET");
+console.log("- GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "SET" : "NOT SET");
+
 if (!REDIS_URL) {
   throw new Error("Missing REDIS_URL in environment variables");
 }
