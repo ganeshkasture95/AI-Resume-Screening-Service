@@ -3,7 +3,7 @@ import { scoreSchema, ScoreResult } from "@/lib/llm/scoreSchema";
 import { loadPrompt } from "@/lib/prompts/loadPrompt";
 
 const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-1.5-flash-latest";
 const LLM_MAX_RETRIES = Number(process.env.LLM_MAX_RETRIES ?? "3");
 const LLM_RETRY_BACKOFF_MS = Number(process.env.LLM_RETRY_BACKOFF_MS ?? "1500");
 

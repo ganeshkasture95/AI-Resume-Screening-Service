@@ -8,20 +8,21 @@ export const runtime = "nodejs";
 
 async function extractResumeText(file: File): Promise<string> {
     if (file.size === 0) {
-        throw new Error("Uploaded PDF is empty.");
+        throw new Error("uploaded PDF is empty");
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const parser = new PDFParse({ data: buffer });
-    try {
-        const parsed = await parser.getText();
-        return parsed.text?.trim() ?? "";
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown PDF parse error";
-        throw new Error(`Could not parse the uploaded PDF. ${message}`);
-    } finally {
-        await parser.destroy();
+    const bytes = await file.arrayBuffer();
+    const parser = new PDFParse({ data: Buffer.from(bytes) });
+    const result = await parser.getText();
+    await parser.destroy();
+
+    const text = result.text?.trim() ?? "";
+
+    if (!text) {
+        throw new Error("no readable text found in PDF");
     }
+
+    return text;
 }
 
 export async function POST(request: Request) {
@@ -31,46 +32,20 @@ export async function POST(request: Request) {
         const jobDescription = formData.get("job_description");
 
         if (!(resume instanceof File)) {
-            return Response.json(
-                { error: "Missing resume file. Use form-data key 'resume'." },
-                { status: 400 },
-            );
+            return Response.json({ error: "resume file is required" }, { status: 400 });
         }
 
         if (resume.type !== "application/pdf") {
-            return Response.json(
-                { error: "Invalid resume file type. Only PDF is allowed." },
-                { status: 400 },
-            );
+            return Response.json({ error: "only PDF files are allowed" }, { status: 400 });
         }
 
         if (typeof jobDescription !== "string" || !jobDescription.trim()) {
-            return Response.json(
-                { error: "Missing job description. Use form-data key 'job_description'." },
-                { status: 400 },
-            );
+            return Response.json({ error: "job_description is required" }, { status: 400 });
         }
 
-        let resumeText = "";
-        try {
-            resumeText = await extractResumeText(resume);
-        } catch (error) {
-            return Response.json(
-                {
-                    error:
-                        error instanceof Error
-                            ? error.message
-                            : "Could not read the uploaded PDF.",
-                },
-                { status: 400 },
-            );
-        }
-
+        const resumeText = await extractResumeText(resume);
         if (!resumeText) {
-            return Response.json(
-                { error: "Could not extract text from the PDF resume." },
-                { status: 400 },
-            );
+            return Response.json({ error: "could not read resume text" }, { status: 400 });
         }
 
         await connectToDatabase();
@@ -81,7 +56,7 @@ export async function POST(request: Request) {
             status: "queued",
             resumeFileMeta: {
                 fileName: resume.name,
-                mimeType: resume.type,
+                mimeType: resume.type || "application/pdf",
                 storageRef: `uploads/${evaluationId}.pdf`,
             },
             resumeText,
@@ -89,42 +64,15 @@ export async function POST(request: Request) {
             missingRequirements: [],
         });
 
-        try {
-            await enqueueEvaluationJob({ evaluationId });
-        } catch (error) {
-            await EvaluationModel.updateOne(
-                { evaluationId },
-                {
-                    $set: {
-                        status: "failed",
-                        error: "Failed to enqueue evaluation job.",
-                    },
-                },
-            );
-
-            return Response.json(
-                {
-                    error:
-                        error instanceof Error
-                            ? `Queue connection failed: ${error.message}`
-                            : "Queue connection failed.",
-                },
-                { status: 503 },
-            );
-        }
+        await enqueueEvaluationJob({ evaluationId });
 
         return Response.json(
             { evaluation_id: evaluationId, status: "queued" },
             { status: 202 },
         );
     } catch (error) {
+        const message = error instanceof Error ? error.message : "unexpected error";
         console.error("POST /api/evaluations failed:", error);
-        return Response.json(
-            {
-                error:
-                    error instanceof Error ? error.message : "Unexpected server error",
-            },
-            { status: 500 },
-        );
+        return Response.json({ error: message }, { status: 500 });
     }
 }
