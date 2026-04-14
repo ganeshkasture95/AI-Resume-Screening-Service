@@ -2,18 +2,18 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { EvaluationQueueJob } from "@/lib/queue/types";
 
-const REDIS_URL = process.env.REDIS_URL;
+const REDIS_URL = process.env.REDIS_URL ?? "";
 const EVALUATION_QUEUE_NAME =
   process.env.BULLMQ_QUEUE_NAME ?? "resume-evaluation-queue";
-
-if (!REDIS_URL) {
-  throw new Error("Missing REDIS_URL in environment variables");
-}
 
 let redisConnection: IORedis | null = null;
 let evaluationQueue: Queue<EvaluationQueueJob> | null = null;
 
 function getRedisConnection(): IORedis {
+  if (!REDIS_URL) {
+    throw new Error("Missing REDIS_URL in environment variables");
+  }
+
   if (!redisConnection) {
     redisConnection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,

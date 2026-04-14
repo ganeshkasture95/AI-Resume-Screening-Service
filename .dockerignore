@@ -1,0 +1,11 @@
+node_modules
+.next
+coverage
+npm-debug.log*
+.git
+.env
+tests
+*.test.ts
+*.md
+.env.deploy.example
+.env.example

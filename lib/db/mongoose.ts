@@ -1,13 +1,12 @@
 import mongoose from "mongoose";
 
-const MONGO_DB_URL = process.env.MONGO_DB_URL;
-const MONGO_DB_NAME = process.env.MONGO_DB_NAME ?? "resume_screening";
-
-if (!MONGO_DB_URL) {
-  throw new Error("Missing MONGO_DB_URL in environment variables");
+function getMongoDbUrl(): string {
+  const mongoDbUrl = process.env.MONGO_DB_URL;
+  if (!mongoDbUrl) {
+    throw new Error("Missing MONGO_DB_URL in environment variables");
+  }
+  return mongoDbUrl;
 }
-
-const mongoDbUrl: string = MONGO_DB_URL;
 
 declare global {
   var mongooseConnection:
@@ -32,8 +31,8 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(mongoDbUrl, {
-      dbName: MONGO_DB_NAME,
+    cached.promise = mongoose.connect(getMongoDbUrl(), {
+      dbName: process.env.MONGO_DB_NAME ?? "resume_screening",
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 10000,
     });

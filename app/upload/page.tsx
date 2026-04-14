@@ -53,12 +53,13 @@ export default function UploadPage() {
     if (submitState.type !== "success") {
       return;
     }
+    const evaluationId = submitState.evaluationId;
 
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     async function checkStatus() {
-      const response = await fetch(`/api/evaluations/${submitState.evaluationId}`);
+      const response = await fetch(`/api/evaluations/${evaluationId}`);
       const data = await response.json();
 
       if (!response.ok) {
